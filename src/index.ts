@@ -44,13 +44,18 @@ server.tool(
     };
 
     const results = data.organic ?? [];
-    if (results.length === 0) return { content: [{ type: "text", text: `No results found for page ${page}.` }] };
+    if (results.length === 0) return { content: [{ type: "text", text: `No results found for page ${page}. Do not paginate further for this query.` }] };
 
     const offset = (page - 1) * num_results;
+    const hasMore = results.length === num_results;
+    const paginationHint = hasMore
+      ? `\n\n[Full page returned (${results.length}/${num_results}). You MAY fetch page ${page + 1} for more results if needed.]`
+      : `\n\n[Partial page returned (${results.length}/${num_results}). Do not paginate further for this query — no more results exist.]`;
+
     const text = [
       `Page ${page} — results ${offset + 1}–${offset + results.length}:`,
       ...results.map((r, i) => `${offset + i + 1}. **${r.title}**\n   URL: ${r.link}\n   ${r.snippet}`),
-    ].join("\n\n");
+    ].join("\n\n") + paginationHint;
 
     return { content: [{ type: "text", text }] };
   }
