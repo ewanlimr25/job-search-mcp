@@ -8,7 +8,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const SEEN_JOBS_FILE = path.join(__dirname, "..", "output", "seen_jobs.json");
-const RESULTS_FILE = path.join(__dirname, "..", "output", "jobs.md");
+const OUTPUT_DIR = path.join(__dirname, "..", "output");
 
 const server = new McpServer({
   name: "job-search",
@@ -111,16 +111,17 @@ server.tool(
 
 server.tool(
   "save_results",
-  "Save the final ranked job results to output/jobs.md and record all found URLs as seen. Call once at the end of a search session.",
+  "Save the final ranked job results to a dated file (e.g. output/jobs-2026-03-19.md) and append new URLs to the seen jobs log. Call once at the end of a search session.",
   {
     content: z.string().describe("Full formatted markdown of the job results to save"),
     seen_urls: z.array(z.string()).describe("All job URLs found this run, to mark as seen"),
   },
   async ({ content, seen_urls }) => {
-    fs.mkdirSync(path.dirname(RESULTS_FILE), { recursive: true });
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
     const date = new Date().toISOString().split("T")[0];
-    fs.writeFileSync(RESULTS_FILE, `# Job Search Results — ${date}\n\n${content}`, "utf-8");
+    const datedFile = path.join(OUTPUT_DIR, `jobs-${date}.md`);
+    fs.writeFileSync(datedFile, `# Job Search Results — ${date}\n\n${content}`, "utf-8");
 
     let existing: string[] = [];
     if (fs.existsSync(SEEN_JOBS_FILE)) {
@@ -129,7 +130,7 @@ server.tool(
     const merged = Array.from(new Set([...existing, ...seen_urls]));
     fs.writeFileSync(SEEN_JOBS_FILE, JSON.stringify(merged, null, 2), "utf-8");
 
-    return { content: [{ type: "text", text: `Saved ${seen_urls.length} jobs to output/jobs.md and updated seen jobs log.` }] };
+    return { content: [{ type: "text", text: `Saved ${seen_urls.length} jobs to output/jobs-${date}.md and updated seen jobs log.` }] };
   }
 );
 
