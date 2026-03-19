@@ -19,19 +19,20 @@ const server = new McpServer({
 
 server.tool(
   "web_search",
-  "Search the web for job postings using Google (via Serper). Use targeted queries to find listings on LinkedIn, Greenhouse, Lever, Wellfound, and company career pages.",
+  "Search the web for job postings using Google (via Serper). Use targeted queries to find listings on LinkedIn, Greenhouse, Lever, Wellfound, and company career pages. Use the page parameter to paginate through additional results (page 1 = results 1-10, page 2 = results 11-20, etc.).",
   {
     query: z.string().describe("Search query, e.g. 'AI agent engineer startup remote Canada site:linkedin.com'"),
-    num_results: z.number().min(1).max(20).default(10).describe("Number of results to return (default 10)"),
+    num_results: z.number().min(1).max(10).default(10).describe("Number of results to return per page (max 10)"),
+    page: z.number().min(1).default(1).describe("Page number for pagination (default 1). Increment to get more results for the same query."),
   },
-  async ({ query, num_results }) => {
+  async ({ query, num_results, page }) => {
     const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey) throw new Error("SERPER_API_KEY not set");
 
     const response = await fetch("https://google.serper.dev/search", {
       method: "POST",
       headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ q: query, num: num_results }),
+      body: JSON.stringify({ q: query, num: num_results, page }),
     });
 
     if (!response.ok) {
@@ -43,11 +44,13 @@ server.tool(
     };
 
     const results = data.organic ?? [];
-    if (results.length === 0) return { content: [{ type: "text", text: "No results found." }] };
+    if (results.length === 0) return { content: [{ type: "text", text: `No results found for page ${page}.` }] };
 
-    const text = results
-      .map((r, i) => `${i + 1}. **${r.title}**\n   URL: ${r.link}\n   ${r.snippet}`)
-      .join("\n\n");
+    const offset = (page - 1) * num_results;
+    const text = [
+      `Page ${page} — results ${offset + 1}–${offset + results.length}:`,
+      ...results.map((r, i) => `${offset + i + 1}. **${r.title}**\n   URL: ${r.link}\n   ${r.snippet}`),
+    ].join("\n\n");
 
     return { content: [{ type: "text", text }] };
   }
